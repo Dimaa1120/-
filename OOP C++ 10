@@ -1,0 +1,592 @@
+#include <iostream>
+#include <vector>
+#include <memory>
+#include <fstream>
+#include <algorithm>
+#include <stdexcept>
+#include <string>
+#include <limits>
+
+
+using namespace std;
+
+// Базовый класс пользователя
+class User {
+protected:
+    string name;
+    int id;
+    int accessLevel;
+
+public:
+    User(const string& name, int id, int accessLevel)
+        : name(name), id(id), accessLevel(accessLevel) {
+        if (name.empty()) {
+            throw invalid_argument("Имя пользователя не может быть пустым");
+        }
+        if (accessLevel < 0) {
+            throw invalid_argument("Уровень доступа не может быть отрицательным");
+        }
+    }
+
+    virtual ~User() = default;
+
+    // Геттеры
+    string getName() const { return name; }
+    int getId() const { return id; }
+    int getAccessLevel() const { return accessLevel; }
+
+    // Сеттеры
+    void setName(const string& newName) {
+        if (newName.empty()) throw invalid_argument("Имя не может быть пустым");
+        name = newName;
+    }
+    void setId(int newId) { id = newId; }
+    void setAccessLevel(int level) {
+        if (level < 0) throw invalid_argument("Уровень доступа не может быть отрицательным");
+        accessLevel = level;
+    }
+
+    // Виртуальный метод для вывода информации
+    virtual void displayInfo() const {
+        cout << "Имя: " << name << ", ID: " << id
+            << ", Уровень доступа: " << accessLevel;
+    }
+
+    // Виртуальный метод для сохранения в файл
+    virtual void saveToFile(ofstream& out) const {
+        out << name << "\n" << id << "\n" << accessLevel << "\n";
+    }
+
+    // Виртуальный метод для загрузки из файла
+    virtual void loadFromFile(ifstream& in) {
+        getline(in, name);
+        in >> id >> accessLevel;
+        in.ignore(); // Пропустить символ новой строки
+    }
+
+    // Виртуальный метод для создания копии объекта
+    virtual unique_ptr<User> clone() const = 0;
+};
+
+// Класс студента
+class Student : public User {
+private:
+    string group;
+
+public:
+    Student(const string& name, int id, int accessLevel, const string& group)
+        : User(name, id, accessLevel), group(group) {
+        if (group.empty()) {
+            throw invalid_argument("Группа не может быть пустой");
+        }
+    }
+
+    string getGroup() const { return group; }
+    void setGroup(const string& newGroup) {
+        if (newGroup.empty()) throw invalid_argument("Группа не может быть пустой");
+        group = newGroup;
+    }
+
+    void displayInfo() const override {
+        User::displayInfo();
+        cout << ", Группа: " << group << " (Студент)\n";
+    }
+
+    void saveToFile(ofstream& out) const override {
+        out << "Student\n";
+        User::saveToFile(out);
+        out << group << "\n";
+    }
+
+    void loadFromFile(ifstream& in) override {
+        User::loadFromFile(in);
+        getline(in, group);
+    }
+
+    unique_ptr<User> clone() const override {
+        return make_unique<Student>(*this);
+    }
+};
+
+// Класс преподавателя
+class Teacher : public User {
+private:
+    string department;
+
+public:
+    Teacher(const string& name, int id, int accessLevel, const string& department)
+        : User(name, id, accessLevel), department(department) {
+        if (department.empty()) {
+            throw invalid_argument("Кафедра не может быть пустой");
+        }
+    }
+
+    string getDepartment() const { return department; }
+    void setDepartment(const string& newDepartment) {
+        if (newDepartment.empty()) throw invalid_argument("Кафедра не может быть пустой");
+        department = newDepartment;
+    }
+
+    void displayInfo() const override {
+        User::displayInfo();
+        cout << ", Кафедра: " << department << " (Преподаватель)\n";
+    }
+
+    void saveToFile(ofstream& out) const override {
+        out << "Teacher\n";
+        User::saveToFile(out);
+        out << department << "\n";
+    }
+
+    void loadFromFile(ifstream& in) override {
+        User::loadFromFile(in);
+        getline(in, department);
+    }
+
+    unique_ptr<User> clone() const override {
+        return make_unique<Teacher>(*this);
+    }
+};
+
+// Класс администратора
+class Administrator : public User {
+private:
+    string position;
+
+public:
+    Administrator(const string& name, int id, int accessLevel, const string& position)
+        : User(name, id, accessLevel), position(position) {
+        if (position.empty()) {
+            throw invalid_argument("Должность не может быть пустой");
+        }
+    }
+
+    string getPosition() const { return position; }
+    void setPosition(const string& newPosition) {
+        if (newPosition.empty()) throw invalid_argument("Должность не может быть пустой");
+        position = newPosition;
+    }
+
+    void displayInfo() const override {
+        User::displayInfo();
+        cout << ", Должность: " << position << " (Администратор)\n";
+    }
+
+    void saveToFile(ofstream& out) const override {
+        out << "Administrator\n";
+        User::saveToFile(out);
+        out << position << "\n";
+    }
+
+    void loadFromFile(ifstream& in) override {
+        User::loadFromFile(in);
+        getline(in, position);
+    }
+
+    unique_ptr<User> clone() const override {
+        return make_unique<Administrator>(*this);
+    }
+};
+
+// Класс ресурса университета
+class Resource {
+private:
+    string name;
+    int requiredAccessLevel;
+
+public:
+    Resource(const string& name, int requiredAccessLevel)
+        : name(name), requiredAccessLevel(requiredAccessLevel) {
+        if (name.empty()) {
+            throw invalid_argument("Название ресурса не может быть пустым");
+        }
+        if (requiredAccessLevel < 0) {
+            throw invalid_argument("Требуемый уровень доступа не может быть отрицательным");
+        }
+    }
+
+    string getName() const { return name; }
+    int getRequiredAccessLevel() const { return requiredAccessLevel; }
+
+    void setName(const string& newName) {
+        if (newName.empty()) throw invalid_argument("Название ресурса не может быть пустым");
+        name = newName;
+    }
+    void setRequiredAccessLevel(int level) {
+        if (level < 0) throw invalid_argument("Требуемый уровень доступа не может быть отрицательным");
+        requiredAccessLevel = level;
+    }
+
+    bool checkAccess(const User& user) const {
+        return user.getAccessLevel() >= requiredAccessLevel;
+    }
+
+    void displayInfo() const {
+        cout << "Ресурс: " << name << ", Требуемый уровень доступа: "
+            << requiredAccessLevel << "\n";
+    }
+
+    void saveToFile(ofstream& out) const {
+        out << name << "\n" << requiredAccessLevel << "\n";
+    }
+
+    void loadFromFile(ifstream& in) {
+        getline(in, name);
+        in >> requiredAccessLevel;
+        in.ignore(); // Пропустить символ новой строки
+    }
+};
+
+// Шаблонный класс системы контроля доступа
+template<typename T>
+class AccessControlSystem {
+private:
+    vector<unique_ptr<User>> users;
+    vector<T> resources;
+
+public:
+    void addUser(unique_ptr<User> user) {
+        users.push_back(move(user));
+    }
+
+    void addResource(const T& resource) {
+        resources.push_back(resource);
+    }
+
+    bool checkAccess(int userId, const string& resourceName) const {
+        auto userIt = find_if(users.begin(), users.end(),
+            [userId](const auto& user) { return user->getId() == userId; });
+
+        auto resourceIt = find_if(resources.begin(), resources.end(),
+            [resourceName](const auto& res) { return res.getName() == resourceName; });
+
+        if (userIt == users.end() || resourceIt == resources.end()) {
+            return false;
+        }
+
+        return resourceIt->checkAccess(**userIt);
+    }
+
+    void displayAllUsers() const {
+        if (users.empty()) {
+            cout << "Нет пользователей в системе.\n";
+            return;
+        }
+        for (const auto& user : users) {
+            user->displayInfo();
+        }
+    }
+
+    void displayAllResources() const {
+        if (resources.empty()) {
+            cout << "Нет ресурсов в системе.\n";
+            return;
+        }
+        for (const auto& resource : resources) {
+            resource.displayInfo();
+        }
+    }
+
+    void saveToFile(const string& filename) const {
+        ofstream out(filename);
+        if (!out) {
+            throw runtime_error("Не удалось открыть файл для записи");
+        }
+
+        // Сохраняем пользователей
+        out << users.size() << "\n";
+        for (const auto& user : users) {
+            user->saveToFile(out);
+        }
+
+        // Сохраняем ресурсы
+        out << resources.size() << "\n";
+        for (const auto& resource : resources) {
+            resource.saveToFile(out);
+        }
+
+        cout << "Данные успешно сохранены в файл: " << filename << "\n";
+    }
+
+    void loadFromFile(const string& filename) {
+        ifstream in(filename);
+        if (!in) {
+            throw runtime_error("Не удалось открыть файл для чтения");
+        }
+
+        users.clear();
+        resources.clear();
+
+        // Загружаем пользователей
+        int userCount;
+        in >> userCount;
+        in.ignore(); // Пропустить символ новой строки
+
+        for (int i = 0; i < userCount; ++i) {
+            string userType;
+            getline(in, userType);
+
+            unique_ptr<User> user;
+            if (userType == "Student") {
+                user = make_unique<Student>("", 0, 0, "");
+            }
+            else if (userType == "Teacher") {
+                user = make_unique<Teacher>("", 0, 0, "");
+            }
+            else if (userType == "Administrator") {
+                user = make_unique<Administrator>("", 0, 0, "");
+            }
+            else {
+                throw runtime_error("Неизвестный тип пользователя в файле");
+            }
+
+            user->loadFromFile(in);
+            users.push_back(move(user));
+        }
+
+        // Загружаем ресурсы
+        int resourceCount;
+        in >> resourceCount;
+        in.ignore(); // Пропустить символ новой строки
+
+        for (int i = 0; i < resourceCount; ++i) {
+            T resource("", 0);
+            resource.loadFromFile(in);
+            resources.push_back(resource);
+        }
+
+        cout << "Данные успешно загружены из файла: " << filename << "\n";
+    }
+
+    void searchUserByName(const string& name) const {
+        bool found = false;
+        for (const auto& user : users) {
+            if (user->getName().find(name) != string::npos) {
+                user->displayInfo();
+                found = true;
+            }
+        }
+        if (!found) {
+            cout << "Пользователи с именем '" << name << "' не найдены.\n";
+        }
+    }
+
+    void searchUserById(int id) const {
+        auto it = find_if(users.begin(), users.end(),
+            [id](const auto& user) { return user->getId() == id; });
+
+        if (it != users.end()) {
+            (*it)->displayInfo();
+        }
+        else {
+            cout << "Пользователь с ID " << id << " не найден.\n";
+        }
+    }
+
+    void sortUsersByAccessLevel() {
+        sort(users.begin(), users.end(),
+            [](const auto& a, const auto& b) {
+                return a->getAccessLevel() < b->getAccessLevel();
+            });
+        cout << "Пользователи отсортированы по уровню доступа.\n";
+    }
+
+    void sortUsersByName() {
+        sort(users.begin(), users.end(),
+            [](const auto& a, const auto& b) {
+                return a->getName() < b->getName();
+            });
+        cout << "Пользователи отсортированы по имени.\n";
+    }
+
+    const vector<unique_ptr<User>>& getUsers() const { return users; }
+    const vector<T>& getResources() const { return resources; }
+};
+
+// Функция для очистки ввода
+void clearInput() {
+    cin.clear();
+    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+}
+
+// Функция для создания пользователя
+unique_ptr<User> createUser() {
+    string name, additionalInfo;
+    int id, accessLevel;
+    char type;
+
+    cout << "\nВыберите тип пользователя:\n";
+    cout << "1. Студент\n";
+    cout << "2. Преподаватель\n";
+    cout << "3. Администратор\n";
+    cout << "Ваш выбор: ";
+    cin >> type;
+    clearInput();
+
+    cout << "Введите имя: ";
+    getline(cin, name);
+
+    cout << "Введите ID: ";
+    while (!(cin >> id)) {
+        cout << "Неверный ввод. Пожалуйста, введите число: ";
+        clearInput();
+    }
+    clearInput();
+
+    cout << "Введите уровень доступа: ";
+    while (!(cin >> accessLevel) || accessLevel < 0) {
+        cout << "Неверный ввод. Уровень доступа должен быть положительным числом: ";
+        clearInput();
+    }
+    clearInput();
+
+    switch (type) {
+    case '1':
+        cout << "Введите группу студента: ";
+        getline(cin, additionalInfo);
+        return make_unique<Student>(name, id, accessLevel, additionalInfo);
+    case '2':
+        cout << "Введите кафедру преподавателя: ";
+        getline(cin, additionalInfo);
+        return make_unique<Teacher>(name, id, accessLevel, additionalInfo);
+    case '3':
+        cout << "Введите должность администратора: ";
+        getline(cin, additionalInfo);
+        return make_unique<Administrator>(name, id, accessLevel, additionalInfo);
+    default:
+        throw invalid_argument("Неверный тип пользователя");
+    }
+}
+
+// Функция для создания ресурса
+Resource createResource() {
+    string name;
+    int requiredAccessLevel;
+
+    cout << "\nВведите название ресурса: ";
+    getline(cin, name);
+
+    cout << "Введите требуемый уровень доступа: ";
+    while (!(cin >> requiredAccessLevel) || requiredAccessLevel < 0) {
+        cout << "Неверный ввод. Уровень доступа должен быть положительным числом: ";
+        clearInput();
+    }
+    clearInput();
+
+    return Resource(name, requiredAccessLevel);
+}
+
+// Главное меню
+void mainMenu() {
+    AccessControlSystem<Resource> system;
+    char choice;
+    string filename;
+    string searchName;
+    int searchId;
+
+    do {
+        cout << "\n=== Система контроля доступа университета ===\n";
+        cout << "1. Добавить пользователя\n";
+        cout << "2. Добавить ресурс\n";
+        cout << "3. Показать всех пользователей\n";
+        cout << "4. Показать все ресурсы\n";
+        cout << "5. Проверить доступ пользователя к ресурсу\n";
+        cout << "6. Поиск пользователя по имени\n";
+        cout << "7. Поиск пользователя по ID\n";
+        cout << "8. Сортировать пользователей по уровню доступа\n";
+        cout << "9. Сортировать пользователей по имени\n";
+        cout << "10. Сохранить данные в файл\n";
+        cout << "11. Загрузить данные из файла\n";
+        cout << "0. Выход\n";
+        cout << "Ваш выбор: ";
+        cin >> choice;
+        clearInput();
+
+        try {
+            switch (choice) {
+            case '1':
+                system.addUser(createUser());
+                cout << "Пользователь успешно добавлен.\n";
+                break;
+            case '2':
+                system.addResource(createResource());
+                cout << "Ресурс успешно добавлен.\n";
+                break;
+            case '3':
+                cout << "\nСписок всех пользователей:\n";
+                system.displayAllUsers();
+                break;
+            case '4':
+                cout << "\nСписок всех ресурсов:\n";
+                system.displayAllResources();
+                break;
+            case '5': {
+                int userId;
+                string resourceName;
+
+                cout << "Введите ID пользователя: ";
+                while (!(cin >> userId)) {
+                    cout << "Неверный ввод. Пожалуйста, введите число: ";
+                    clearInput();
+                }
+                clearInput();
+
+                cout << "Введите название ресурса: ";
+                getline(cin, resourceName);
+
+                if (system.checkAccess(userId, resourceName)) {
+                    cout << "Доступ разрешен.\n";
+                }
+                else {
+                    cout << "Доступ запрещен или пользователь/ресурс не найден.\n";
+                }
+                break;
+            }
+            case '6':
+                cout << "Введите имя для поиска: ";
+                getline(cin, searchName);
+                system.searchUserByName(searchName);
+                break;
+            case '7':
+                cout << "Введите ID для поиска: ";
+                while (!(cin >> searchId)) {
+                    cout << "Неверный ввод. Пожалуйста, введите число: ";
+                    clearInput();
+                }
+                clearInput();
+                system.searchUserById(searchId);
+                break;
+            case '8':
+                system.sortUsersByAccessLevel();
+                break;
+            case '9':
+                system.sortUsersByName();
+                break;
+            case '10':
+                cout << "Введите имя файла для сохранения: ";
+                getline(cin, filename);
+                system.saveToFile(filename);
+                break;
+            case '11':
+                cout << "Введите имя файла для загрузки: ";
+                getline(cin, filename);
+                system.loadFromFile(filename);
+                break;
+            case '0':
+                cout << "Выход из программы.\n";
+                break;
+            default:
+                cout << "Неверный выбор. Попробуйте снова.\n";
+            }
+        }
+        catch (const exception& e) {
+            cerr << "Ошибка: " << e.what() << "\n";
+        }
+    } while (choice != '0');
+}
+
+int main() {
+    setlocale(LC_ALL, "ru");
+    mainMenu();
+    return 0;
+}
